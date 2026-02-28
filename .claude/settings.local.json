@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npm create vite@latest client -- --template vue)",
+      "Bash(npm install pinia vue-router socket.io-client)",
+      "Bash(npm run build)",
+      "Bash(node -e \":*)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill /PID 39464 /F)",
+      "Bash(cmd.exe /c \"taskkill /PID 39464 /F\")",
+      "Bash(cmd.exe /c \"taskkill /F /PID 39464\")",
+      "Bash(powershell -Command \"Stop-Process -Id 39464 -Force\")"
+    ]
+  }
+}

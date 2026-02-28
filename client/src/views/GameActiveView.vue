@@ -1,0 +1,290 @@
+<script setup>
+import { computed, watch } from 'vue'
+import { useLobbyStore } from '@/stores/lobbyStore'
+import { usePlayerStore } from '@/stores/playerStore'
+import { useGameStore } from '@/stores/gameStore'
+import { useSocket } from '@/composables/useSocket'
+import { useAudio } from '@/composables/useAudio'
+import { ROLE_INFO, LOL_ROLE_INFO } from '@/constants'
+
+const lobbyStore = useLobbyStore()
+const playerStore = usePlayerStore()
+const gameStore = useGameStore()
+const { emit: socketEmit } = useSocket()
+const { play, isMuted, toggleMute } = useAudio()
+
+const isHost = computed(() => playerStore.isHost)
+const myRole = computed(() => playerStore.secretRole)
+const roleInfo = computed(() => myRole.value ? ROLE_INFO[myRole.value] : null)
+const isDroide = computed(() => myRole.value === 'Droide')
+const isDoubleFace = computed(() => myRole.value === 'Double-Face')
+const doubleFaceMode = computed(() => playerStore.doubleFaceMode)
+
+const myTeam = computed(() => playerStore.team)
+const myTeamPlayers = computed(() => {
+  if (myTeam.value === 'equipe1') return lobbyStore.equipe1Players
+  if (myTeam.value === 'equipe2') return lobbyStore.equipe2Players
+  return []
+})
+
+// Play audio when command changes
+watch(() => gameStore.currentCommand, (cmd) => {
+  if (cmd?.audioPath) play(cmd.audioPath)
+})
+
+function endLol() {
+  socketEmit('game:lol_ended', {})
+}
+</script>
+
+<template>
+  <div class="game-active">
+    <div class="game-layout">
+
+      <!-- Main content -->
+      <div class="game-main">
+
+        <!-- Role reminder card -->
+        <div class="role-reminder card" :style="{ '--role-color': roleInfo?.color }">
+          <div class="reminder-header">
+            <span class="reminder-label text-muted text-xs">VOTRE RÔLE SECRET</span>
+            <button class="btn btn-ghost btn-sm" @click="toggleMute" :title="isMuted ? 'Activer le son' : 'Couper le son'">
+              {{ isMuted ? '🔇' : '🔊' }}
+            </button>
+          </div>
+          <div class="reminder-body">
+            <span class="reminder-emoji">{{ roleInfo?.emoji }}</span>
+            <div>
+              <div class="reminder-name" :style="{ color: roleInfo?.color }">{{ myRole }}</div>
+              <div class="reminder-obj text-secondary text-sm">{{ roleInfo?.objective }}</div>
+            </div>
+          </div>
+
+          <!-- Romeo partner -->
+          <div v-if="myRole === 'Romeo' && playerStore.romeoPartnerName" class="romeo-info mt-2">
+            💘 Âme sœur : <strong>{{ playerStore.romeoPartnerName }}</strong>
+          </div>
+        </div>
+
+        <!-- Double Face state -->
+        <Transition name="state">
+          <div
+            v-if="isDoubleFace && doubleFaceMode"
+            class="double-face-card"
+            :class="doubleFaceMode === 'allie' ? 'mode-allie' : 'mode-imposteur'"
+          >
+            <div class="df-icon">{{ doubleFaceMode === 'allie' ? '🤝' : '🎭' }}</div>
+            <div class="df-label">MODE ACTUEL</div>
+            <div class="df-mode">{{ doubleFaceMode === 'allie' ? 'ALLIÉ' : 'IMPOSTEUR' }}</div>
+            <div class="df-desc text-sm">
+              {{ doubleFaceMode === 'allie'
+                ? 'Tu dois GAGNER la partie'
+                : 'Tu dois PERDRE la partie' }}
+            </div>
+          </div>
+        </Transition>
+
+        <!-- Droide command -->
+        <Transition name="command">
+          <div v-if="isDroide && gameStore.currentCommand" class="droide-command card">
+            <div class="command-header text-muted text-xs">📡 ORDRE REÇU</div>
+            <div class="command-text">{{ gameStore.currentCommand.text }}</div>
+          </div>
+        </Transition>
+
+        <div v-if="isDroide && !gameStore.currentCommand" class="droide-waiting card text-center">
+          <p class="text-secondary animate-pulse">📡 En attente d'un ordre...</p>
+        </div>
+
+        <!-- Team panel -->
+        <div class="team-panel card">
+          <h3 class="text-secondary text-xs mb-2">VOTRE ÉQUIPE</h3>
+          <div class="team-list">
+            <div
+              v-for="player in myTeamPlayers"
+              :key="player.id"
+              class="team-member"
+              :class="{ 'is-me': player.id === playerStore.id }"
+            >
+              <span class="lol-badge" :style="{ background: LOL_ROLE_INFO[player.lolRole]?.color + '33', color: LOL_ROLE_INFO[player.lolRole]?.color }">
+                {{ LOL_ROLE_INFO[player.lolRole]?.emoji }} {{ player.lolRole }}
+              </span>
+              <span class="member-name">{{ player.username }}</span>
+              <span v-if="player.id === playerStore.id" class="badge badge-gold" style="font-size: 0.6rem">Vous</span>
+              <span v-if="player.cumulativeScore" class="member-score">{{ player.cumulativeScore }}pts</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Host controls panel -->
+      <div v-if="isHost" class="host-panel card">
+        <h3 class="text-gold mb-4">🎮 Contrôles Host</h3>
+
+        <!-- End game -->
+        <div class="host-section">
+          <p class="text-secondary text-sm mb-2">Fin de la partie LoL :</p>
+          <button class="btn btn-danger btn-block" @click="endLol">
+            🏁 La partie LoL est terminée
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.game-active {
+  flex: 1;
+  padding: 1.5rem;
+}
+
+.game-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 1.5rem;
+  max-width: 900px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+.game-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Role reminder */
+.role-reminder {
+  border-color: var(--role-color, var(--gold));
+  background: var(--blue-card);
+}
+
+.reminder-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.reminder-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.reminder-body {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.reminder-emoji { font-size: 2rem; }
+.reminder-name { font-size: 1.3rem; font-weight: 700; }
+.romeo-info { font-size: 0.88rem; color: var(--text-secondary); }
+
+/* Double Face */
+.double-face-card {
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  border: 2px solid;
+  animation: bounceIn 0.4s ease;
+}
+
+.mode-allie {
+  background: rgba(26, 107, 224, 0.15);
+  border-color: var(--equipe1-light);
+  color: var(--equipe1-light);
+}
+
+.mode-imposteur {
+  background: rgba(192, 57, 43, 0.15);
+  border-color: var(--equipe2-light);
+  color: var(--equipe2-light);
+}
+
+.df-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.df-label { font-size: 0.7rem; letter-spacing: 0.1em; opacity: 0.7; }
+.df-mode { font-size: 2rem; font-weight: 900; letter-spacing: 0.1em; }
+.df-desc { color: inherit; opacity: 0.8; margin-top: 0.25rem; }
+
+/* Droide command */
+.droide-command {
+  border-color: #3498db;
+  background: rgba(52, 152, 219, 0.1);
+}
+
+.command-header {
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.command-text {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #4d9fff;
+}
+
+.droide-waiting { padding: 1rem; }
+
+/* Team panel */
+.team-panel { background: var(--blue-panel); }
+
+.team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.team-member {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.team-member.is-me {
+  background: rgba(200, 155, 60, 0.1);
+}
+
+.lol-badge {
+  padding: 0.15em 0.5em;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.member-name { font-size: 0.88rem; flex: 1; }
+.member-score { font-size: 0.65rem; font-weight: 700; color: var(--gold); flex-shrink: 0; }
+
+/* Host panel */
+.host-panel {
+  background: var(--blue-panel);
+  position: sticky;
+  top: 80px;
+}
+
+.host-section { }
+
+/* Transitions */
+.state-enter-active, .state-leave-active { transition: all 0.4s ease; }
+.state-enter-from, .state-leave-to { opacity: 0; transform: scale(0.9); }
+
+.command-enter-active, .command-leave-active { transition: all 0.3s ease; }
+.command-enter-from, .command-leave-to { opacity: 0; transform: translateY(-10px); }
+
+@media (max-width: 768px) {
+  .game-layout {
+    grid-template-columns: 1fr;
+  }
+  .host-panel {
+    position: static;
+    order: -1;
+  }
+}
+</style>
