@@ -107,8 +107,44 @@ function handleDisconnect(socketId, io) {
 function cleanupLobby(lobby) {
   if (lobby.currentGame) {
     DoubleFaceManager.cleanup(lobby.currentGame);
+    // Clear per-player Droide timers
+    if (lobby.currentGame.droideTimers) {
+      for (const timer of lobby.currentGame.droideTimers.values()) {
+        clearTimeout(timer);
+      }
+      lobby.currentGame.droideTimers.clear();
+    }
   }
   lobbies.delete(lobby.code);
+}
+
+// Voluntarily remove a player (they clicked "Quitter")
+// Returns the lobby if it still has players, null if it was deleted.
+function removePlayer(lobby, socketId) {
+  const player = lobby.players.get(socketId);
+  if (!player) return null;
+
+  lobby.players.delete(socketId);
+
+  // Transfer host to next connected non-bot player if needed
+  if (player.isHost) {
+    const nextHost = Array.from(lobby.players.values()).find(
+      (p) => p.isConnected && !p.isBot
+    );
+    if (nextHost) {
+      nextHost.isHost = true;
+      lobby.hostId = nextHost.id;
+    }
+  }
+
+  // If no real (non-bot) players remain, disband the lobby
+  const realPlayers = Array.from(lobby.players.values()).filter((p) => !p.isBot);
+  if (realPlayers.length === 0) {
+    cleanupLobby(lobby);
+    return null;
+  }
+
+  return lobby;
 }
 
 function getPlayerFromLobby(lobby, socketId) {
@@ -122,5 +158,6 @@ module.exports = {
   getLobbyBySocket,
   handleDisconnect,
   cleanupLobby,
+  removePlayer,
   getPlayerFromLobby,
 };

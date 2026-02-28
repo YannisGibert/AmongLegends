@@ -95,6 +95,15 @@ function _wireStoreEvents() {
     lobbyStore.updateLobby(lobby)
   })
 
+  // Player left voluntarily OR lobby was disbanded by host
+  const _resetAndLeave = () => {
+    lobbyStore.reset()
+    playerStore.reset()
+    gameStore.reset()
+  }
+  socket.on('lobby:left', _resetAndLeave)
+  socket.on('lobby:disbanded', _resetAndLeave)
+
   // ─── Game phase ───
   socket.on('game:phase_changed', ({ phase }) => {
     lobbyStore.phase = phase

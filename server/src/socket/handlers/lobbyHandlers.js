@@ -139,6 +139,43 @@ function registerLobbyHandlers(io, socket) {
       socket.emit('error:general', { message: err.message });
     }
   });
+
+  // Player voluntarily leaves the lobby
+  socket.on('lobby:leave', () => {
+    try {
+      const lobby = LobbyManager.getLobbyBySocket(socket.id);
+      if (!lobby) return;
+
+      const lobbyCode = lobby.code;
+      const remainingLobby = LobbyManager.removePlayer(lobby, socket.id);
+
+      socket.leave(lobbyCode);
+      socket.emit('lobby:left', {});
+
+      if (remainingLobby) {
+        io.to(lobbyCode).emit('lobby:updated', { lobby: remainingLobby.toDTO() });
+      }
+    } catch (err) {
+      socket.emit('error:general', { message: err.message });
+    }
+  });
+
+  // Host disbands (destroys) the lobby for everyone
+  socket.on('lobby:disband', () => {
+    try {
+      const lobby = LobbyManager.getLobbyBySocket(socket.id);
+      if (!lobby) return socket.emit('error:general', { message: 'Lobby introuvable.' });
+
+      const requester = lobby.players.get(socket.id);
+      if (!requester?.isHost) return socket.emit('error:general', { message: 'Seul l\'host peut dissoudre le lobby.' });
+
+      // Notify all players before cleanup
+      io.to(lobby.code).emit('lobby:disbanded', {});
+      LobbyManager.cleanupLobby(lobby);
+    } catch (err) {
+      socket.emit('error:general', { message: err.message });
+    }
+  });
 }
 
 module.exports = { registerLobbyHandlers };

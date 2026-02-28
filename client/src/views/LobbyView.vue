@@ -21,6 +21,17 @@ const lobbyStore = useLobbyStore()
 const playerStore = usePlayerStore()
 const { emit } = useSocket()
 
+const isHost = computed(() => playerStore.isHost)
+
+function leaveLobby() {
+  emit('lobby:leave', {})
+}
+
+function disbandLobby() {
+  if (!confirm('Dissoudre le lobby ? Tous les joueurs seront renvoyés au menu principal.')) return
+  emit('lobby:disband', {})
+}
+
 const phaseComponents = {
   [GamePhase.LOBBY_WAITING]: LobbyWaiting,
   [GamePhase.ROLE_WHEEL]: RoleWheelView,
@@ -76,6 +87,14 @@ watch(() => lobbyStore.code, (code) => {
         </div>
         <div class="player-count text-muted text-sm">
           {{ lobbyStore.players.length }} joueur{{ lobbyStore.players.length > 1 ? 's' : '' }}
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost btn-sm leave-btn" @click="leaveLobby" title="Quitter le lobby">
+            ↩ Quitter
+          </button>
+          <button v-if="isHost" class="btn btn-ghost btn-sm disband-btn" @click="disbandLobby" title="Dissoudre le lobby">
+            🗑 Dissoudre
+          </button>
         </div>
       </div>
     </header>
@@ -146,6 +165,34 @@ watch(() => lobbyStore.code, (code) => {
 .copy-btn {
   padding: 0.1rem 0.3rem;
   font-size: 0.75rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.leave-btn {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+.leave-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.disband-btn {
+  font-size: 0.78rem;
+  color: var(--red-light);
+  border-color: rgba(192, 57, 43, 0.3);
+}
+
+.disband-btn:hover:not(:disabled) {
+  background: rgba(192, 57, 43, 0.12) !important;
+  border-color: rgba(192, 57, 43, 0.6);
 }
 
 .lobby-main {
