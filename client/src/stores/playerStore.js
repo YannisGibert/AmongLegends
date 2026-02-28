@@ -12,6 +12,7 @@ export const usePlayerStore = defineStore('player', () => {
   const romeoPartnerId = ref(null)
   const romeoPartnerName = ref(null)
   const doubleFaceMode = ref(null) // 'allie' | 'imposteur' | null
+  const doubleFaceTimerEnd = ref(null) // timestamp (ms) when next flip occurs, or null
 
   function setIdentity(player) {
     id.value = player.id
@@ -39,6 +40,7 @@ export const usePlayerStore = defineStore('player', () => {
     romeoPartnerId.value = null
     romeoPartnerName.value = null
     doubleFaceMode.value = null
+    doubleFaceTimerEnd.value = null
   }
 
   return {
@@ -50,6 +52,7 @@ export const usePlayerStore = defineStore('player', () => {
     romeoPartnerId,
     romeoPartnerName,
     doubleFaceMode,
+    doubleFaceTimerEnd,
     setIdentity,
     setSecretRole,
     syncFromLobby,

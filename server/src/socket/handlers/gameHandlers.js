@@ -2,6 +2,7 @@ const LobbyManager = require('../../managers/LobbyManager');
 const GameManager = require('../../managers/GameManager');
 const BotManager = require('../../managers/BotManager');
 const VotingManager = require('../../managers/VotingManager');
+const ChampionManager = require('../../managers/ChampionManager');
 const { GamePhase } = require('../../config/constants');
 
 // Lazy-require to avoid circular dependency (votingHandlers exports finalize)
@@ -45,8 +46,8 @@ function registerGameHandlers(io, socket) {
     }
   });
 
-  // Host: confirm the wheel result → assign secret roles
-  socket.on('game:confirm_roles', () => {
+  // Host: confirm the wheel result → assign secret roles (+ optional champion draft)
+  socket.on('game:confirm_roles', async () => {
     try {
       const lobby = LobbyManager.getLobbyBySocket(socket.id);
       if (!lobby) return socket.emit('error:general', { message: 'Lobby introuvable.' });
@@ -55,16 +56,38 @@ function registerGameHandlers(io, socket) {
       if (!requester?.isHost) return socket.emit('error:general', { message: 'Seul l\'host peut confirmer.' });
       if (lobby.phase !== GamePhase.ROLE_WHEEL) return socket.emit('error:general', { message: 'Phase incorrecte.' });
 
+      // Assign secret roles (sets lobby.phase = ROLES_ASSIGNED)
       GameManager.confirmRoles(lobby);
 
-      // Broadcast updated lobby (LoL roles visible to all)
+      // Check champion draft — may override phase to CHAMPION_REVEAL
+      await ChampionManager.maybeAssignChampions(lobby);
+
+      // Broadcast updated lobby (LoL roles + champion names if assigned)
       io.to(lobby.code).emit('lobby:updated', { lobby: lobby.toDTO() });
       io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase });
 
-      // Send private secret roles to each player
+      // Always send private secret roles to each player
       for (const player of lobby.getActivePlayers()) {
         io.to(player.id).emit('game:roles_assigned', player.toPrivateDTO());
       }
+    } catch (err) {
+      socket.emit('error:general', { message: err.message });
+    }
+  });
+
+  // Host: confirm champion reveal → proceed to roles assigned
+  socket.on('game:confirm_champions', () => {
+    try {
+      const lobby = LobbyManager.getLobbyBySocket(socket.id);
+      if (!lobby) return socket.emit('error:general', { message: 'Lobby introuvable.' });
+
+      const requester = lobby.players.get(socket.id);
+      if (!requester?.isHost) return socket.emit('error:general', { message: 'Seul l\'host peut confirmer.' });
+      if (lobby.phase !== GamePhase.CHAMPION_REVEAL) return socket.emit('error:general', { message: 'Phase incorrecte.' });
+
+      lobby.phase = GamePhase.ROLES_ASSIGNED;
+      io.to(lobby.code).emit('lobby:updated', { lobby: lobby.toDTO() });
+      io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase });
     } catch (err) {
       socket.emit('error:general', { message: err.message });
     }

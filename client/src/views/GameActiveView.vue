@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, watch, ref, onMounted, onUnmounted } from 'vue'
 import { useLobbyStore } from '@/stores/lobbyStore'
 import { usePlayerStore } from '@/stores/playerStore'
 import { useGameStore } from '@/stores/gameStore'
@@ -25,6 +25,42 @@ const myTeamPlayers = computed(() => {
   if (myTeam.value === 'equipe1') return lobbyStore.equipe1Players
   if (myTeam.value === 'equipe2') return lobbyStore.equipe2Players
   return []
+})
+
+// ─── Timer countdowns ─────────────────────────────────────────────────────────
+const droideSecondsLeft = ref(null)
+const dfSecondsLeft = ref(null)
+
+function formatTimer(sec) {
+  if (sec == null || sec < 0) return null
+  const m = Math.floor(sec / 60)
+  const s = Math.floor(sec % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+const droideTimerDisplay = computed(() => formatTimer(droideSecondsLeft.value))
+const dfTimerDisplay = computed(() => formatTimer(dfSecondsLeft.value))
+
+let timerInterval = null
+
+onMounted(() => {
+  timerInterval = setInterval(() => {
+    const now = Date.now()
+    if (gameStore.droideTimerEnd) {
+      droideSecondsLeft.value = Math.max(0, (gameStore.droideTimerEnd - now) / 1000)
+    } else {
+      droideSecondsLeft.value = null
+    }
+    if (playerStore.doubleFaceTimerEnd) {
+      dfSecondsLeft.value = Math.max(0, (playerStore.doubleFaceTimerEnd - now) / 1000)
+    } else {
+      dfSecondsLeft.value = null
+    }
+  }, 500)
+})
+
+onUnmounted(() => {
+  clearInterval(timerInterval)
 })
 
 // Play audio when command changes
@@ -81,6 +117,9 @@ function endLol() {
                 ? 'Tu dois GAGNER la partie'
                 : 'Tu dois PERDRE la partie' }}
             </div>
+            <div v-if="dfTimerDisplay" class="df-timer text-xs">
+              ⏱ Prochain changement dans <strong>{{ dfTimerDisplay }}</strong>
+            </div>
           </div>
         </Transition>
 
@@ -89,6 +128,9 @@ function endLol() {
           <div v-if="isDroide && gameStore.currentCommand" class="droide-command card">
             <div class="command-header text-muted text-xs">📡 ORDRE REÇU</div>
             <div class="command-text">{{ gameStore.currentCommand.text }}</div>
+            <div v-if="droideTimerDisplay" class="droide-timer text-xs">
+              ⏱ Prochain ordre dans <strong>{{ droideTimerDisplay }}</strong>
+            </div>
           </div>
         </Transition>
 
@@ -111,7 +153,7 @@ function endLol() {
               </span>
               <span class="member-name">{{ player.username }}</span>
               <span v-if="player.id === playerStore.id" class="badge badge-gold" style="font-size: 0.6rem">Vous</span>
-              <span v-if="player.cumulativeScore" class="member-score">{{ player.cumulativeScore }}pts</span>
+              <span v-if="player.cumulativeScore != null" class="member-score">{{ player.cumulativeScore }}pts</span>
             </div>
           </div>
         </div>
@@ -208,6 +250,7 @@ function endLol() {
 .df-label { font-size: 0.7rem; letter-spacing: 0.1em; opacity: 0.7; }
 .df-mode { font-size: 2rem; font-weight: 900; letter-spacing: 0.1em; }
 .df-desc { color: inherit; opacity: 0.8; margin-top: 0.25rem; }
+.df-timer { opacity: 0.65; margin-top: 0.5rem; }
 
 /* Droide command */
 .droide-command {
@@ -226,6 +269,8 @@ function endLol() {
   font-weight: 800;
   color: #4d9fff;
 }
+
+.droide-timer { color: #4d9fff; opacity: 0.7; margin-top: 0.5rem; }
 
 .droide-waiting { padding: 1rem; }
 

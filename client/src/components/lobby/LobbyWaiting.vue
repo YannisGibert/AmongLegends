@@ -77,8 +77,8 @@ function addBot() {
           </div>
         </div>
 
-        <!-- Bot section (host only, testing) -->
-        <div v-if="isHost" class="card bot-card">
+        <!-- Bot section (host only, testMode active) -->
+        <div v-if="isHost && lobbyStore.settings.testMode" class="card bot-card">
           <div class="bot-header">
             <h3 class="text-sm" style="color: var(--text-secondary)">🤖 Mode test</h3>
             <span v-if="totalBots > 0" class="badge badge-purple">{{ totalBots }} bot{{ totalBots > 1 ? 's' : '' }}</span>

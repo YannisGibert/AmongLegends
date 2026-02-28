@@ -21,30 +21,32 @@ function assignSecretRoles(lobby) {
   const equipe1 = lobby.getTeamPlayers(Teams.EQUIPE1);
   const equipe2 = lobby.getTeamPlayers(Teams.EQUIPE2);
   const symmetric = lobby.settings.symmetricRoles !== false; // default true
+  const testMode = lobby.settings.testMode === true;
+  const forcedRoles = lobby.forcedRoles || {};
 
   let roles1 = null;
 
   if (equipe1.length > 0) {
     if (symmetric) {
-      // Pick N unique roles from the pool (no duplicates within a team)
       roles1 = pickRandomN(ALL_ROLES, equipe1.length);
     } else {
-      // Full random: each player gets any role, duplicates allowed
       roles1 = Array.from({ length: equipe1.length }, () => ALL_ROLES[Math.floor(Math.random() * ALL_ROLES.length)]);
     }
-    equipe1.forEach((player, i) => { player.secretRole = roles1[i]; });
+    equipe1.forEach((player, i) => {
+      player.secretRole = (testMode && forcedRoles[player.id]) ? forcedRoles[player.id] : roles1[i];
+    });
   }
 
   if (equipe2.length > 0) {
     let roles2;
     if (symmetric && roles1) {
-      // Same distribution as equipe1, just reshuffled
       roles2 = shuffle([...roles1]);
     } else {
-      // Full random for equipe2 too
       roles2 = Array.from({ length: equipe2.length }, () => ALL_ROLES[Math.floor(Math.random() * ALL_ROLES.length)]);
     }
-    equipe2.forEach((player, i) => { player.secretRole = roles2[i]; });
+    equipe2.forEach((player, i) => {
+      player.secretRole = (testMode && forcedRoles[player.id]) ? forcedRoles[player.id] : roles2[i];
+    });
   }
 
   // Handle Romeo pairing

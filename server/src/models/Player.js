@@ -14,6 +14,7 @@ class Player {
     this.secretRole = null;
     this.romeoPartnerId = null;
     this.romeoPartnerName = null;
+    this.champion = null; // LoL champion assigned by champion draft
 
     // Cumulative across all rounds in this lobby
     this.cumulativeScore = 0;
@@ -29,6 +30,7 @@ class Player {
       isConnected: this.isConnected,
       team: this.team,
       lolRole: this.lolRole,
+      champion: this.champion,
       cumulativeScore: this.cumulativeScore,
       roundScores: this.roundScores,
       // secretRole intentionally omitted from DTO
@@ -48,6 +50,7 @@ class Player {
     this.secretRole = null;
     this.romeoPartnerId = null;
     this.romeoPartnerName = null;
+    this.champion = null;
   }
 }
 

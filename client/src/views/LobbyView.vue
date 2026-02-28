@@ -8,6 +8,7 @@ import { GamePhase } from '@/constants'
 
 import LobbyWaiting from '@/components/lobby/LobbyWaiting.vue'
 import RoleWheelView from '@/views/RoleWheelView.vue'
+import ChampionRevealView from '@/views/ChampionRevealView.vue'
 import RolesAssignedView from '@/views/RolesAssignedView.vue'
 import GameActiveView from '@/views/GameActiveView.vue'
 import ResultsInputView from '@/views/ResultsInputView.vue'
@@ -23,6 +24,7 @@ const { emit } = useSocket()
 const phaseComponents = {
   [GamePhase.LOBBY_WAITING]: LobbyWaiting,
   [GamePhase.ROLE_WHEEL]: RoleWheelView,
+  [GamePhase.CHAMPION_REVEAL]: ChampionRevealView,
   [GamePhase.ROLES_ASSIGNED]: RolesAssignedView,
   [GamePhase.LOL_STARTED]: GameActiveView,
   [GamePhase.LOL_ENDED]: ResultsInputView,

@@ -1,7 +1,9 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { usePlayerStore } from '@/stores/playerStore'
+import { useLobbyStore } from '@/stores/lobbyStore'
 import { useSocket } from '@/composables/useSocket'
+import { ALL_ROLES } from '@/constants'
 
 const props = defineProps({
   team: String,
@@ -10,10 +12,12 @@ const props = defineProps({
 })
 
 const playerStore = usePlayerStore()
+const lobbyStore = useLobbyStore()
 const { emit } = useSocket()
 
 const isHost = computed(() => playerStore.isHost)
 const myTeam = computed(() => playerStore.team)
+const testMode = computed(() => lobbyStore.settings.testMode === true)
 const isDragOver = ref(false)
 
 function movePlayer(targetId, team) {
@@ -26,6 +30,10 @@ function joinTeam() {
 
 function removeBot(botId) {
   emit('lobby:remove_bot', { botId })
+}
+
+function setForcedRole(playerId, role) {
+  emit('lobby:set_forced_role', { targetPlayerId: playerId, role: role || null })
 }
 
 // Drag-and-drop (host only)
@@ -95,7 +103,20 @@ const canJoin = computed(() => myTeam.value !== props.team)
           <span class="player-name">{{ player.username }}</span>
           <span v-if="player.isHost" class="badge badge-gold host-badge">Host</span>
           <span v-if="!player.isConnected && !player.isBot" class="badge badge-grey">Déco</span>
-          <span v-if="player.cumulativeScore" class="player-score">{{ player.cumulativeScore }}pts</span>
+          <span v-if="player.cumulativeScore != null" class="player-score">{{ player.cumulativeScore }}pts</span>
+        </div>
+
+        <!-- Forced role selector (host + testMode + active teams only) -->
+        <div v-if="isHost && testMode && team !== 'spectateur'" class="role-select-wrap">
+          <select
+            class="role-select"
+            :value="lobbyStore.forcedRoles[player.id] || ''"
+            @change="setForcedRole(player.id, $event.target.value)"
+            @click.stop
+          >
+            <option value="">Aléatoire</option>
+            <option v-for="role in ALL_ROLES" :key="role" :value="role">{{ role }}</option>
+          </select>
         </div>
 
         <div class="row-actions">
@@ -248,6 +269,28 @@ const canJoin = computed(() => myTeam.value !== props.team)
   color: var(--gold);
   margin-left: auto;
   flex-shrink: 0;
+}
+
+/* Forced role selector */
+.role-select-wrap {
+  flex-shrink: 0;
+}
+
+.role-select {
+  background: var(--blue-dark);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  padding: 0.15rem 0.3rem;
+  cursor: pointer;
+  max-width: 90px;
+}
+
+.role-select:focus {
+  outline: none;
+  border-color: var(--gold);
+  color: var(--gold);
 }
 
 .row-actions {

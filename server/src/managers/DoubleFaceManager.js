@@ -1,8 +1,11 @@
 const { Roles } = require('../config/constants');
 const { randomBetween } = require('../utils/arrayUtils');
 
-const MIN_INTERVAL_MS = 1 * 60 * 1000;  // 1 minute
-const MAX_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+function _randomDelayMs(lobby) {
+  const minMs = (lobby.settings.doubleFaceMinSeconds ?? 60) * 1000;
+  const maxMs = (lobby.settings.doubleFaceMaxSeconds ?? 600) * 1000;
+  return randomBetween(minMs, maxMs);
+}
 
 function startForGame(lobby, io) {
   if (!lobby.currentGame) return;
@@ -23,20 +26,23 @@ function _scheduleStateChange(playerId, mode, lobby, io) {
   // Store current mode
   lobby.currentGame.doubleFaceStates.set(playerId, mode);
 
-  // Find player's socket id (playerId IS socket.id in this app)
-  io.to(playerId).emit('doubleFace:state_changed', { mode });
+  // Calculate next flip delay
+  const delayMs = _randomDelayMs(lobby);
 
-  // Schedule next flip
-  const delayMs = randomBetween(MIN_INTERVAL_MS, MAX_INTERVAL_MS);
+  // Emit current mode; include countdown if showTimers is enabled
+  const payload = { mode };
+  if (lobby.settings.showTimers) payload.nextFlipMs = delayMs;
+  io.to(playerId).emit('doubleFace:state_changed', payload);
+
+  // Clear previous timer if any
+  const oldTimer = lobby.currentGame.doubleFaceTimers.get(playerId);
+  if (oldTimer) clearTimeout(oldTimer);
+
   const timer = setTimeout(() => {
     if (!lobby.currentGame) return;
     const nextMode = mode === 'allie' ? 'imposteur' : 'allie';
     _scheduleStateChange(playerId, nextMode, lobby, io);
   }, delayMs);
-
-  // Clear previous timer if any
-  const oldTimer = lobby.currentGame.doubleFaceTimers.get(playerId);
-  if (oldTimer) clearTimeout(oldTimer);
 
   lobby.currentGame.doubleFaceTimers.set(playerId, timer);
 }

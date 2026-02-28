@@ -115,13 +115,15 @@ function _wireStoreEvents() {
   })
 
   // ─── Double Face ───
-  socket.on('doubleFace:state_changed', ({ mode }) => {
+  socket.on('doubleFace:state_changed', ({ mode, nextFlipMs }) => {
     playerStore.doubleFaceMode = mode
+    playerStore.doubleFaceTimerEnd = nextFlipMs ? Date.now() + nextFlipMs : null
   })
 
   // ─── Droide commands ───
-  socket.on('droide:command_changed', ({ command }) => {
+  socket.on('droide:command_changed', ({ command, nextCommandMs }) => {
     gameStore.currentCommand = command
+    gameStore.droideTimerEnd = nextCommandMs ? Date.now() + nextCommandMs : null
   })
 
   // ─── Vote progress ───

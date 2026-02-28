@@ -3,7 +3,6 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const path = require('path');
 
 const { attachSocketHandlers } = require('./src/socket/index');
 
@@ -27,15 +26,6 @@ app.use(express.json());
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', env: NODE_ENV }));
-
-// Serve built client in production
-if (NODE_ENV === 'production') {
-  const clientDist = path.join(__dirname, '../client/dist');
-  app.use(express.static(clientDist));
-  app.get('*', (_req, res) => {
-    res.sendFile(path.join(clientDist, 'index.html'));
-  });
-}
 
 attachSocketHandlers(io);
 

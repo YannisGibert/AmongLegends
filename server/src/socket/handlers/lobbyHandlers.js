@@ -103,11 +103,35 @@ function registerLobbyHandlers(io, socket) {
         return socket.emit('error:general', { message: 'Seul l\'host peut modifier les paramètres.' });
       }
 
-      if (typeof settings.enableEnemyVoting === 'boolean') {
-        lobby.settings.enableEnemyVoting = settings.enableEnemyVoting;
+      const boolKeys = ['enableEnemyVoting', 'symmetricRoles', 'testMode', 'showTimers', 'championDraft'];
+      const numKeys = ['droideMinSeconds', 'droideMaxSeconds', 'doubleFaceMinSeconds', 'doubleFaceMaxSeconds', 'championDraftChance'];
+
+      for (const key of boolKeys) {
+        if (typeof settings[key] === 'boolean') lobby.settings[key] = settings[key];
       }
-      if (typeof settings.symmetricRoles === 'boolean') {
-        lobby.settings.symmetricRoles = settings.symmetricRoles;
+      for (const key of numKeys) {
+        if (typeof settings[key] === 'number' && settings[key] >= 0) lobby.settings[key] = settings[key];
+      }
+
+      io.to(lobby.code).emit('lobby:updated', { lobby: lobby.toDTO() });
+    } catch (err) {
+      socket.emit('error:general', { message: err.message });
+    }
+  });
+
+  socket.on('lobby:set_forced_role', ({ targetPlayerId, role }) => {
+    try {
+      const lobby = LobbyManager.getLobbyBySocket(socket.id);
+      if (!lobby) return socket.emit('error:general', { message: 'Lobby introuvable.' });
+
+      const requester = lobby.players.get(socket.id);
+      if (!requester?.isHost) return socket.emit('error:general', { message: 'Seul l\'host peut forcer les rôles.' });
+      if (!lobby.settings.testMode) return socket.emit('error:general', { message: 'Le mode test est désactivé.' });
+
+      if (role === null || role === undefined || role === '') {
+        delete lobby.forcedRoles[targetPlayerId];
+      } else {
+        lobby.forcedRoles[targetPlayerId] = role;
       }
 
       io.to(lobby.code).emit('lobby:updated', { lobby: lobby.toDTO() });

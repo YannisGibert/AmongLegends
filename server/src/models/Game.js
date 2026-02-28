@@ -23,7 +23,7 @@ class Game {
     this.droideCommands = new Map(); // playerId -> current command
     this.commandDeck = [];           // shuffled deck of commands
     this.commandHistory = [];
-    this.droideCommandTimer = null;  // auto-send interval reference
+    this.droideTimers = new Map();   // playerId -> per-player setTimeout reference
 
     // Final scores for this round
     this.scores = null; // Map<playerId, { round, breakdown }>
