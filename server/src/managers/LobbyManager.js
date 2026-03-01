@@ -74,10 +74,10 @@ function handleDisconnect(socketId, io) {
 
   player.isConnected = false;
 
-  // If host disconnects, transfer host to next connected player
+  // If host disconnects, transfer host to next connected non-bot player
   if (player.isHost) {
     const nextPlayer = Array.from(lobby.players.values()).find(
-      (p) => p.isConnected && p.id !== socketId
+      (p) => p.isConnected && !p.isBot && p.id !== socketId
     );
     if (nextPlayer) {
       player.isHost = false;
@@ -86,19 +86,22 @@ function handleDisconnect(socketId, io) {
     }
   }
 
-  // If all players disconnected, cleanup lobby after 10 minutes
-  const connectedCount = Array.from(lobby.players.values()).filter(
-    (p) => p.isConnected
+  // If no real (non-bot) players remain connected, cleanup lobby after 3 minutes
+  const realConnected = Array.from(lobby.players.values()).filter(
+    (p) => p.isConnected && !p.isBot
   ).length;
 
-  if (connectedCount === 0) {
+  if (realConnected === 0) {
     setTimeout(() => {
       const currentLobby = lobbies.get(lobby.code);
-      if (currentLobby) {
+      if (!currentLobby) return;
+      const stillConnected = Array.from(currentLobby.players.values()).filter(
+        (p) => p.isConnected && !p.isBot
+      ).length;
+      if (stillConnected === 0) {
         cleanupLobby(currentLobby);
-        lobbies.delete(lobby.code);
       }
-    }, 10 * 60 * 1000);
+    }, 3 * 60 * 1000);
   }
 
   return lobby;

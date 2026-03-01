@@ -34,13 +34,18 @@ watch(() => lobbyStore.settings, (s) => {
   championChance.value = s.championDraftChance ?? 100
 }, { deep: true })
 
-function toggle(key, refVal) {
-  refVal.value = !refVal.value
-  emit('lobby:update_settings', { settings: { [key]: refVal.value } })
+const boolRefs = { enableEnemyVoting: enemyVoting, symmetricRoles, testMode, showTimers, championDraft }
+const numRefs = { droideMinSeconds: droideMin, droideMaxSeconds: droideMax, doubleFaceMinSeconds: dfMin, doubleFaceMaxSeconds: dfMax, championDraftChance: championChance }
+
+function toggle(key) {
+  const r = boolRefs[key]
+  r.value = !r.value
+  emit('lobby:update_settings', { settings: { [key]: r.value } })
 }
 
-function updateNum(key, refVal) {
-  const v = Number(refVal.value)
+function updateNum(key) {
+  const r = numRefs[key]
+  const v = Number(r.value)
   if (!isNaN(v) && v >= 0) {
     emit('lobby:update_settings', { settings: { [key]: v } })
   }
@@ -52,7 +57,7 @@ function updateNum(key, refVal) {
     <h3 class="text-gold mb-3">⚙ Paramètres</h3>
 
     <!-- Rôles symétriques -->
-    <div class="setting-row" @click="toggle('symmetricRoles', symmetricRoles)">
+    <div class="setting-row" @click="toggle('symmetricRoles')">
       <div class="setting-info">
         <div class="setting-label">Rôles symétriques</div>
         <div class="setting-desc text-muted text-xs">
@@ -63,7 +68,7 @@ function updateNum(key, refVal) {
     </div>
 
     <!-- Vote équipe adverse -->
-    <div class="setting-row" @click="toggle('enableEnemyVoting', enemyVoting)">
+    <div class="setting-row" @click="toggle('enableEnemyVoting')">
       <div class="setting-info">
         <div class="setting-label">Vote équipe adverse</div>
         <div class="setting-desc text-muted text-xs">
@@ -74,7 +79,7 @@ function updateNum(key, refVal) {
     </div>
 
     <!-- Mode Test -->
-    <div class="setting-row" @click="toggle('testMode', testMode)">
+    <div class="setting-row" @click="toggle('testMode')">
       <div class="setting-info">
         <div class="setting-label">🧪 Mode Test</div>
         <div class="setting-desc text-muted text-xs">
@@ -87,7 +92,7 @@ function updateNum(key, refVal) {
     <div class="settings-section-title">⏱ Timers</div>
 
     <!-- Timers visibles -->
-    <div class="setting-row" @click="toggle('showTimers', showTimers)">
+    <div class="setting-row" @click="toggle('showTimers')">
       <div class="setting-info">
         <div class="setting-label">Timers visibles</div>
         <div class="setting-desc text-muted text-xs">
@@ -107,7 +112,7 @@ function updateNum(key, refVal) {
             type="number" min="10" max="3600"
             class="num-input"
             v-model.number="droideMin"
-            @change="updateNum('droideMinSeconds', droideMin)"
+            @change="updateNum('droideMinSeconds')"
           />
         </div>
         <div class="timer-input-row">
@@ -116,7 +121,7 @@ function updateNum(key, refVal) {
             type="number" min="10" max="3600"
             class="num-input"
             v-model.number="droideMax"
-            @change="updateNum('droideMaxSeconds', droideMax)"
+            @change="updateNum('droideMaxSeconds')"
           />
         </div>
       </div>
@@ -132,7 +137,7 @@ function updateNum(key, refVal) {
             type="number" min="10" max="3600"
             class="num-input"
             v-model.number="dfMin"
-            @change="updateNum('doubleFaceMinSeconds', dfMin)"
+            @change="updateNum('doubleFaceMinSeconds')"
           />
         </div>
         <div class="timer-input-row">
@@ -141,7 +146,7 @@ function updateNum(key, refVal) {
             type="number" min="10" max="3600"
             class="num-input"
             v-model.number="dfMax"
-            @change="updateNum('doubleFaceMaxSeconds', dfMax)"
+            @change="updateNum('doubleFaceMaxSeconds')"
           />
         </div>
       </div>
@@ -150,7 +155,7 @@ function updateNum(key, refVal) {
     <div class="settings-section-title">🏆 Draft Champion LoL</div>
 
     <!-- Champion Draft toggle -->
-    <div class="setting-row" @click="toggle('championDraft', championDraft)">
+    <div class="setting-row" @click="toggle('championDraft')">
       <div class="setting-info">
         <div class="setting-label">Draft de champion</div>
         <div class="setting-desc text-muted text-xs">
@@ -170,7 +175,7 @@ function updateNum(key, refVal) {
             type="number" min="1" max="100"
             class="num-input"
             v-model.number="championChance"
-            @change="updateNum('championDraftChance', championChance)"
+            @change="updateNum('championDraftChance')"
           />
         </div>
       </div>
