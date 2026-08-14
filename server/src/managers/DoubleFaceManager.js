@@ -56,6 +56,30 @@ function stopForGame(game) {
   // doubleFaceStates preserved for scoring
 }
 
+// Called when a Double Face player reconnects with a new socket.id
+function restartPlayerTimer(newId, oldId, lobby, io) {
+  if (!lobby.currentGame) return;
+
+  // Rekey state
+  const currentMode = lobby.currentGame.doubleFaceStates.get(oldId);
+  if (currentMode !== undefined) {
+    lobby.currentGame.doubleFaceStates.delete(oldId);
+  }
+
+  const player = lobby.players.get(newId);
+  if (!player || player.secretRole !== Roles.DOUBLE_FACE) return;
+
+  // Cancel old timer
+  const oldTimer = lobby.currentGame.doubleFaceTimers.get(oldId);
+  if (oldTimer) {
+    clearTimeout(oldTimer);
+    lobby.currentGame.doubleFaceTimers.delete(oldId);
+  }
+
+  // Restart with preserved mode (or fresh random)
+  _scheduleStateChange(newId, currentMode || (Math.random() < 0.5 ? 'allie' : 'imposteur'), lobby, io);
+}
+
 function cleanup(game) {
   stopForGame(game);
   if (game) {
@@ -63,4 +87,11 @@ function cleanup(game) {
   }
 }
 
-module.exports = { startForGame, stopForGame, cleanup };
+// Host override: force a specific Double Face player's mode right now,
+// rescheduling their next automatic flip from this point.
+function hostSetMode(playerId, mode, lobby, io) {
+  if (!lobby.currentGame) return;
+  _scheduleStateChange(playerId, mode, lobby, io);
+}
+
+module.exports = { startForGame, stopForGame, cleanup, restartPlayerTimer, hostSetMode };

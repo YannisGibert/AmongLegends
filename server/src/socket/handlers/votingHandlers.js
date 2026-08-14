@@ -32,7 +32,7 @@ function registerVotingHandlers(io, socket) {
           // Bots vote instantly for enemy phase too
           BotManager.autoVoteBots(lobby, 'enemy');
           io.to(lobby.code).emit('lobby:updated', { lobby: lobby.toDTO() });
-          io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase });
+          io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase, lolStartedAt: lobby.currentGame?.lolStartedAt ?? null });
           _broadcastVoteProgress(io, lobby, 'enemy');
           // Check again in case only bots remain
           if (VotingManager.checkAllVotedEnemy(lobby)) {
@@ -87,7 +87,7 @@ function finalize(io, lobby) {
   }
 
   io.to(lobby.code).emit('lobby:updated', { lobby: lobby.toDTO() });
-  io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase });
+  io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase, lolStartedAt: lobby.currentGame?.lolStartedAt ?? null });
   io.to(lobby.code).emit('scores:final', { players: scoresPayload });
 }
 

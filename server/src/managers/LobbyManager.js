@@ -31,19 +31,30 @@ function joinLobby(socket, username, code) {
   if (!lobby) {
     throw new Error('Lobby introuvable. Vérifie le code.');
   }
-  if (
-    lobby.phase !== GamePhase.LOBBY_WAITING &&
-    !Array.from(lobby.players.values()).some((p) => p.id === socket.id)
-  ) {
-    throw new Error('La partie a déjà commencé.');
-  }
-
-  // Reconnection: player was already in the lobby
+  // Reconnection with same socket.id (common case: page refresh before full disconnect)
   if (lobby.players.has(socket.id)) {
     const existing = lobby.players.get(socket.id);
     existing.isConnected = true;
     socket.join(upperCode);
-    return { lobby, player: existing, reconnected: true };
+    return { lobby, player: existing, reconnected: true, oldId: null };
+  }
+
+  // Reconnection with new socket.id (socket dropped and reconnected during active game)
+  if (lobby.phase !== GamePhase.LOBBY_WAITING) {
+    const existingPlayer = Array.from(lobby.players.values()).find(
+      (p) => !p.isBot && p.username === username && !p.isConnected
+    );
+    if (existingPlayer) {
+      const oldId = existingPlayer.id;
+      existingPlayer.id = socket.id;
+      existingPlayer.isConnected = true;
+      lobby.players.delete(oldId);
+      lobby.players.set(socket.id, existingPlayer);
+      if (existingPlayer.isHost) lobby.hostId = socket.id;
+      socket.join(upperCode);
+      return { lobby, player: existingPlayer, reconnected: true, oldId };
+    }
+    throw new Error('La partie a déjà commencé.');
   }
 
   const player = new Player({ id: socket.id, username, isHost: false });
@@ -51,7 +62,7 @@ function joinLobby(socket, username, code) {
   lobby.players.set(socket.id, player);
   socket.join(upperCode);
 
-  return { lobby, player, reconnected: false };
+  return { lobby, player, reconnected: false, oldId: null };
 }
 
 function getLobbyByCode(code) {

@@ -1,8 +1,9 @@
 <script setup>
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLobbyStore } from '@/stores/lobbyStore'
 import { usePlayerStore } from '@/stores/playerStore'
+import { useGameStore } from '@/stores/gameStore'
 import { useSocket } from '@/composables/useSocket'
 import { GamePhase } from '@/constants'
 
@@ -19,7 +20,29 @@ const route = useRoute()
 const router = useRouter()
 const lobbyStore = useLobbyStore()
 const playerStore = usePlayerStore()
+const gameStore = useGameStore()
 const { emit } = useSocket()
+
+// ─── Live game timer ──────────────────────────────────────────────────────────
+const gameElapsedDisplay = ref(null)
+let gameTimerInterval = null
+
+onMounted(() => {
+  gameTimerInterval = setInterval(() => {
+    if (lobbyStore.phase !== GamePhase.LOL_STARTED || !gameStore.lolStartedAt) {
+      gameElapsedDisplay.value = null
+      return
+    }
+    const elapsedSec = Math.max(0, Math.floor((Date.now() - gameStore.lolStartedAt) / 1000))
+    const m = Math.floor(elapsedSec / 60)
+    const s = elapsedSec % 60
+    gameElapsedDisplay.value = `${m}:${s.toString().padStart(2, '0')}`
+  }, 1000)
+})
+
+onUnmounted(() => {
+  clearInterval(gameTimerInterval)
+})
 
 const isHost = computed(() => playerStore.isHost)
 
@@ -74,6 +97,10 @@ watch(() => lobbyStore.code, (code) => {
         </span>
       </div>
       <div class="header-right">
+        <div class="game-timer-chip" v-if="gameElapsedDisplay">
+          <span class="text-muted text-xs">⏱</span>
+          <span class="code-value">{{ gameElapsedDisplay }}</span>
+        </div>
         <div class="lobby-code-chip">
           <span class="text-muted text-xs">CODE</span>
           <span class="code-value">{{ lobbyStore.code }}</span>
@@ -145,7 +172,8 @@ watch(() => lobbyStore.code, (code) => {
   gap: 1rem;
 }
 
-.lobby-code-chip {
+.lobby-code-chip,
+.game-timer-chip {
   display: flex;
   align-items: center;
   gap: 0.4rem;

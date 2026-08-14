@@ -7,6 +7,7 @@ import { useGameStore } from '@/stores/gameStore'
 let socket = null
 const isConnected = ref(false)
 const error = ref(null)
+let _keepAliveTimer = null
 
 export function useSocket() {
   function connect() {
@@ -32,11 +33,18 @@ export function useSocket() {
       if (ls.code && ps.username) {
         socket.emit('lobby:join', { username: ps.username, lobbyCode: ls.code })
       }
+      // Keep Render.com free tier alive: send HTTP ping every 10 min
+      if (_keepAliveTimer) clearInterval(_keepAliveTimer)
+      _keepAliveTimer = setInterval(() => {
+        fetch((import.meta.env.VITE_SOCKET_URL || '') + '/health').catch(() => {})
+      }, 10 * 60 * 1000)
     })
 
     socket.on('disconnect', () => {
       isConnected.value = false
       console.log('[Socket] Disconnected')
+      clearInterval(_keepAliveTimer)
+      _keepAliveTimer = null
     })
 
     socket.on('connect_error', (err) => {
@@ -105,9 +113,10 @@ function _wireStoreEvents() {
   socket.on('lobby:disbanded', _resetAndLeave)
 
   // ─── Game phase ───
-  socket.on('game:phase_changed', ({ phase }) => {
+  socket.on('game:phase_changed', ({ phase, lolStartedAt }) => {
     lobbyStore.phase = phase
     gameStore.phase = phase
+    if (lolStartedAt !== undefined) gameStore.lolStartedAt = lolStartedAt
     // Reset votes when entering any voting phase
     if (phase === 'VOTING_SELF' || phase === 'VOTING_ENEMY') {
       gameStore.resetVotes()
@@ -133,6 +142,11 @@ function _wireStoreEvents() {
   socket.on('droide:command_changed', ({ command, nextCommandMs }) => {
     gameStore.currentCommand = command
     gameStore.droideTimerEnd = nextCommandMs ? Date.now() + nextCommandMs : null
+  })
+
+  // ─── Host god-mode panel (spectating host only) ───
+  socket.on('game:host_control_targets', ({ droides, doubleFaces }) => {
+    gameStore.hostControlTargets = { droides, doubleFaces }
   })
 
   // ─── Vote progress ───

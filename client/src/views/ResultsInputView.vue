@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useLobbyStore } from '@/stores/lobbyStore'
 import { usePlayerStore } from '@/stores/playerStore'
 import { useSocket } from '@/composables/useSocket'
@@ -16,6 +16,19 @@ const hasEquipe2 = computed(() => equipe2.value.length > 0)
 const winner = ref('')
 const equipe1Stats = ref({ mostKills: '', mostDeaths: '', mostDamage: '', mostAssists: '' })
 const equipe2Stats = ref({ mostKills: '', mostDeaths: '', mostDamage: '', mostAssists: '' })
+
+// Death counts: { [playerId]: number }
+const deaths = ref({})
+const allPlayers = computed(() => [...equipe1.value, ...equipe2.value])
+
+// Initialize deaths to 0 whenever player list changes
+watch(allPlayers, (players) => {
+  const updated = {}
+  for (const p of players) {
+    updated[p.id] = deaths.value[p.id] ?? 0
+  }
+  deaths.value = updated
+}, { immediate: true })
 
 const canSubmit = computed(() => {
   if (!winner.value) return false
@@ -34,6 +47,7 @@ function submit() {
     winner: winner.value,
     equipe1: equipe1Stats.value,
     equipe2: hasEquipe2.value ? equipe2Stats.value : {},
+    deaths: deaths.value,
   })
 }
 </script>
@@ -139,6 +153,31 @@ function submit() {
           </div>
         </div>
 
+        <!-- Deaths per player -->
+        <div class="card mb-6">
+          <h3 class="mb-3">💀 Nombre de morts</h3>
+          <div class="deaths-grid">
+            <div v-for="p in equipe1" :key="p.id" class="death-row">
+              <span class="death-name team-blue">{{ p.username }}</span>
+              <input
+                type="number" min="0" max="30"
+                class="death-input"
+                v-model.number="deaths[p.id]"
+              />
+            </div>
+            <template v-if="hasEquipe2">
+              <div v-for="p in equipe2" :key="p.id" class="death-row">
+                <span class="death-name team-red">{{ p.username }}</span>
+                <input
+                  type="number" min="0" max="30"
+                  class="death-input"
+                  v-model.number="deaths[p.id]"
+                />
+              </div>
+            </template>
+          </div>
+        </div>
+
         <button
           class="btn btn-primary btn-block btn-lg"
           :disabled="!canSubmit"
@@ -209,6 +248,42 @@ function submit() {
 }
 
 .waiting-host { background: var(--blue-panel); }
+
+.deaths-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.death-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.death-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  flex: 1;
+}
+
+.death-input {
+  width: 70px;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--blue-dark);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  text-align: center;
+  font-family: inherit;
+}
+
+.death-input:focus {
+  outline: none;
+  border-color: var(--gold);
+}
 
 @media (max-width: 480px) {
   .stats-grid { grid-template-columns: 1fr; }

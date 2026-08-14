@@ -9,6 +9,7 @@ const { emit } = useSocket()
 // ─── Boolean toggles ────────────────────────────────────────────────────────
 const enemyVoting = ref(lobbyStore.settings.enableEnemyVoting)
 const symmetricRoles = ref(lobbyStore.settings.symmetricRoles !== false)
+const uniqueRolesPerTeam = ref(lobbyStore.settings.uniqueRolesPerTeam !== false)
 const testMode = ref(lobbyStore.settings.testMode === true)
 const showTimers = ref(lobbyStore.settings.showTimers === true)
 const championDraft = ref(lobbyStore.settings.championDraft === true)
@@ -24,6 +25,7 @@ const championChance = ref(lobbyStore.settings.championDraftChance ?? 100)
 watch(() => lobbyStore.settings, (s) => {
   enemyVoting.value = s.enableEnemyVoting
   symmetricRoles.value = s.symmetricRoles !== false
+  uniqueRolesPerTeam.value = s.uniqueRolesPerTeam !== false
   testMode.value = s.testMode === true
   showTimers.value = s.showTimers === true
   championDraft.value = s.championDraft === true
@@ -34,7 +36,7 @@ watch(() => lobbyStore.settings, (s) => {
   championChance.value = s.championDraftChance ?? 100
 }, { deep: true })
 
-const boolRefs = { enableEnemyVoting: enemyVoting, symmetricRoles, testMode, showTimers, championDraft }
+const boolRefs = { enableEnemyVoting: enemyVoting, symmetricRoles, uniqueRolesPerTeam, testMode, showTimers, championDraft }
 const numRefs = { droideMinSeconds: droideMin, droideMaxSeconds: droideMax, doubleFaceMinSeconds: dfMin, doubleFaceMaxSeconds: dfMax, championDraftChance: championChance }
 
 function toggle(key) {
@@ -65,6 +67,17 @@ function updateNum(key) {
         </div>
       </div>
       <div class="toggle" :class="{ active: symmetricRoles }"><div class="toggle-knob"></div></div>
+    </div>
+
+    <!-- Rôles uniques par équipe -->
+    <div class="setting-row" @click="toggle('uniqueRolesPerTeam')">
+      <div class="setting-info">
+        <div class="setting-label">Rôles uniques par équipe</div>
+        <div class="setting-desc text-muted text-xs">
+          Activé : chaque rôle n'apparaît qu'une fois par équipe. Désactivé : tirage indépendant, doublons possibles (ex. 2 Imposteurs).
+        </div>
+      </div>
+      <div class="toggle" :class="{ active: uniqueRolesPerTeam }"><div class="toggle-knob"></div></div>
     </div>
 
     <!-- Vote équipe adverse -->

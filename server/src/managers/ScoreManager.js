@@ -1,4 +1,4 @@
-const { Roles, ROLE_CONFIG } = require('../config/constants');
+const { Roles, ROLE_CONFIG, Teams } = require('../config/constants');
 const { buildReceivedVotesMap } = require('./VotingManager');
 
 function calculateScores(game, lobby) {
@@ -62,6 +62,19 @@ function calculateScores(game, lobby) {
   const result = game.result;
   if (!result) return scores;
 
+  const deaths = game.playerDeaths || {};
+
+  // Who has the most deaths on their own team (ties all count)
+  const mostDeathsIds = new Set();
+  for (const team of [Teams.EQUIPE1, Teams.EQUIPE2]) {
+    const teamPlayers = players.filter((p) => p.team === team);
+    if (teamPlayers.length === 0) continue;
+    const maxDeaths = Math.max(...teamPlayers.map((p) => deaths[p.id] ?? 0));
+    teamPlayers.forEach((p) => {
+      if ((deaths[p.id] ?? 0) === maxDeaths) mostDeathsIds.add(p.id);
+    });
+  }
+
   for (const player of players) {
     const playerWon = player.team === result.winner;
     const votesReceived = receivedVotes.get(player.id) || [];
@@ -91,14 +104,17 @@ function calculateScores(game, lobby) {
 
       case Roles.ROMEO: {
         roleScore += playerWon ? 2 : -2;
-        roleScore += 1; // condition toujours considérée comme respectée
+        // Doit mourir autant de fois que son âme sœur, ou moins
+        const myDeaths = deaths[player.id] ?? 0;
+        const partnerDeaths = player.romeoPartnerId ? (deaths[player.romeoPartnerId] ?? 0) : null;
+        if (partnerDeaths === null || myDeaths <= partnerDeaths) roleScore += 1;
         break;
       }
 
       case Roles.SERPENTIN: {
         roleScore += playerWon ? 2 : -2;
         if (teamResult.mostDamage === player.id) roleScore += 1;
-        if (teamResult.mostDeaths === player.id) roleScore += 1;
+        if (mostDeathsIds.has(player.id)) roleScore += 1;
         break;
       }
 

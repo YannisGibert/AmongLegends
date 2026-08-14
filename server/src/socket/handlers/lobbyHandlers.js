@@ -1,5 +1,7 @@
 const LobbyManager = require('../../managers/LobbyManager');
 const BotManager = require('../../managers/BotManager');
+const GameManager = require('../../managers/GameManager');
+const DoubleFaceManager = require('../../managers/DoubleFaceManager');
 
 function registerLobbyHandlers(io, socket) {
   socket.on('lobby:create', ({ username }) => {
@@ -23,7 +25,14 @@ function registerLobbyHandlers(io, socket) {
       if (!lobbyCode) {
         return socket.emit('error:general', { message: 'Code lobby manquant.' });
       }
-      const { lobby, player, reconnected } = LobbyManager.joinLobby(socket, username.trim(), lobbyCode);
+      const { lobby, player, reconnected, oldId } = LobbyManager.joinLobby(socket, username.trim(), lobbyCode);
+
+      // If the player reconnected with a new socket.id during an active game, restart their timers
+      if (reconnected && oldId && lobby.currentGame) {
+        GameManager.restartDroideTimer(socket.id, oldId, lobby, io);
+        DoubleFaceManager.restartPlayerTimer(socket.id, oldId, lobby, io);
+      }
+
       socket.emit('lobby:joined', {
         lobbyCode: lobby.code,
         lobby: lobby.toDTO(),
@@ -103,7 +112,7 @@ function registerLobbyHandlers(io, socket) {
         return socket.emit('error:general', { message: 'Seul l\'host peut modifier les paramètres.' });
       }
 
-      const boolKeys = ['enableEnemyVoting', 'symmetricRoles', 'testMode', 'showTimers', 'championDraft'];
+      const boolKeys = ['enableEnemyVoting', 'symmetricRoles', 'uniqueRolesPerTeam', 'testMode', 'showTimers', 'championDraft'];
       const numKeys = ['droideMinSeconds', 'droideMaxSeconds', 'doubleFaceMinSeconds', 'doubleFaceMaxSeconds', 'championDraftChance'];
 
       for (const key of boolKeys) {

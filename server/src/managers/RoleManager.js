@@ -17,21 +17,26 @@ function assignLolRoles(lobby) {
   });
 }
 
+// Draws `count` roles: without repetition (uniqueRoles) or fully independent (duplicates allowed)
+function _generateTeamRoles(count, uniqueRoles) {
+  if (uniqueRoles) {
+    return pickRandomN(ALL_ROLES, count);
+  }
+  return Array.from({ length: count }, () => ALL_ROLES[Math.floor(Math.random() * ALL_ROLES.length)]);
+}
+
 function assignSecretRoles(lobby) {
   const equipe1 = lobby.getTeamPlayers(Teams.EQUIPE1);
   const equipe2 = lobby.getTeamPlayers(Teams.EQUIPE2);
-  const symmetric = lobby.settings.symmetricRoles !== false; // default true
+  const symmetric = lobby.settings.symmetricRoles !== false; // default true: same distribution on both teams
+  const uniqueRoles = lobby.settings.uniqueRolesPerTeam !== false; // default true: no duplicate role within a team
   const testMode = lobby.settings.testMode === true;
   const forcedRoles = lobby.forcedRoles || {};
 
   let roles1 = null;
 
   if (equipe1.length > 0) {
-    if (symmetric) {
-      roles1 = pickRandomN(ALL_ROLES, equipe1.length);
-    } else {
-      roles1 = Array.from({ length: equipe1.length }, () => ALL_ROLES[Math.floor(Math.random() * ALL_ROLES.length)]);
-    }
+    roles1 = _generateTeamRoles(equipe1.length, uniqueRoles);
     equipe1.forEach((player, i) => {
       player.secretRole = (testMode && forcedRoles[player.id]) ? forcedRoles[player.id] : roles1[i];
     });
@@ -42,7 +47,7 @@ function assignSecretRoles(lobby) {
     if (symmetric && roles1) {
       roles2 = shuffle([...roles1]);
     } else {
-      roles2 = Array.from({ length: equipe2.length }, () => ALL_ROLES[Math.floor(Math.random() * ALL_ROLES.length)]);
+      roles2 = _generateTeamRoles(equipe2.length, uniqueRoles);
     }
     equipe2.forEach((player, i) => {
       player.secretRole = (testMode && forcedRoles[player.id]) ? forcedRoles[player.id] : roles2[i];

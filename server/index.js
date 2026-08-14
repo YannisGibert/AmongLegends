@@ -29,7 +29,7 @@ app.get('/health', (_req, res) => res.json({ status: 'ok', env: NODE_ENV }));
 
 attachSocketHandlers(io);
 
-server.listen(PORT, () => {
+server.listen(PORT, process.env.IP, () => {
   console.log(`[Server] Running on port ${PORT} (${NODE_ENV})`);
   if (NODE_ENV !== 'production') {
     console.log(`[Server] Client origin: ${CLIENT_ORIGIN}`);

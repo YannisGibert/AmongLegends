@@ -10,7 +10,25 @@
       "Bash(taskkill /PID 39464 /F)",
       "Bash(cmd.exe /c \"taskkill /PID 39464 /F\")",
       "Bash(cmd.exe /c \"taskkill /F /PID 39464\")",
-      "Bash(powershell -Command \"Stop-Process -Id 39464 -Force\")"
+      "Bash(powershell -Command \"Stop-Process -Id 39464 -Force\")",
+      "Bash(node -c src/data/droideQuests.js)",
+      "Bash(node -c src/managers/GameManager.js)",
+      "Bash(node -c src/models/Game.js)",
+      "Bash(node \"/c/Users/yanni/AppData/Local/Temp/claude/c--Users-yanni-OneDrive-Documents-GitHub-AmongLegends/8f1e8bd0-bbda-468a-8963-656b102cc599/scratchpad/test-droide-quests.js\")",
+      "Bash(node -e ' *)",
+      "Bash(firebase --version)",
+      "WebSearch",
+      "WebFetch(domain:chickita.alwaysdata.net)",
+      "Bash(npm run *)",
+      "Bash(firebase deploy *)",
+      "Bash(node -c index.js)",
+      "Bash(node -c src/socket/handlers/gameHandlers.js)",
+      "Bash(node -c src/socket/handlers/votingHandlers.js)",
+      "Bash(node -c src/managers/DoubleFaceManager.js)",
+      "Bash(node -c src/managers/RoleManager.js)",
+      "Bash(node -c src/models/Lobby.js)",
+      "Bash(node -c src/socket/handlers/lobbyHandlers.js)",
+      "Bash(git add *)"
     ]
   }
 }

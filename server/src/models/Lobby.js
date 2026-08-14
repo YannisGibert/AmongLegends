@@ -9,6 +9,7 @@ class Lobby {
     this.settings = {
       enableEnemyVoting: false,
       symmetricRoles: true, // both teams get the same role distribution when true
+      uniqueRolesPerTeam: true, // no duplicate role within a single team when true
       playerCount: 10, // derived from actual player count when game starts
       // Test mode
       testMode: false,

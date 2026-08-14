@@ -1,9 +1,24 @@
 const LobbyManager = require('../../managers/LobbyManager');
 const GameManager = require('../../managers/GameManager');
+const DoubleFaceManager = require('../../managers/DoubleFaceManager');
 const BotManager = require('../../managers/BotManager');
 const VotingManager = require('../../managers/VotingManager');
 const ChampionManager = require('../../managers/ChampionManager');
-const { GamePhase } = require('../../config/constants');
+const { GamePhase, Roles, Teams } = require('../../config/constants');
+
+// Only the host, spectating (not playing), may use the live game-master controls
+function _requireSpectatingHost(lobby, socket) {
+  const requester = lobby.players.get(socket.id);
+  if (!requester?.isHost || requester.team !== Teams.SPECTATEUR) {
+    socket.emit('error:general', { message: 'Réservé à l\'host spectateur.' });
+    return null;
+  }
+  if (lobby.phase !== GamePhase.LOL_STARTED || !lobby.currentGame) {
+    socket.emit('error:general', { message: 'Partie non active.' });
+    return null;
+  }
+  return requester;
+}
 
 // Lazy-require to avoid circular dependency (votingHandlers exports finalize)
 function getVotingHelpers() {
@@ -23,7 +38,7 @@ function registerGameHandlers(io, socket) {
 
       GameManager.startGame(lobby);
       io.to(lobby.code).emit('lobby:updated', { lobby: lobby.toDTO() });
-      io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase });
+      io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase, lolStartedAt: lobby.currentGame?.lolStartedAt ?? null });
     } catch (err) {
       socket.emit('error:general', { message: err.message });
     }
@@ -64,7 +79,7 @@ function registerGameHandlers(io, socket) {
 
       // Broadcast updated lobby (LoL roles + champion names if assigned)
       io.to(lobby.code).emit('lobby:updated', { lobby: lobby.toDTO() });
-      io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase });
+      io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase, lolStartedAt: lobby.currentGame?.lolStartedAt ?? null });
 
       // Always send private secret roles to each player
       for (const player of lobby.getActivePlayers()) {
@@ -87,7 +102,7 @@ function registerGameHandlers(io, socket) {
 
       lobby.phase = GamePhase.ROLES_ASSIGNED;
       io.to(lobby.code).emit('lobby:updated', { lobby: lobby.toDTO() });
-      io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase });
+      io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase, lolStartedAt: lobby.currentGame?.lolStartedAt ?? null });
     } catch (err) {
       socket.emit('error:general', { message: err.message });
     }
@@ -105,7 +120,7 @@ function registerGameHandlers(io, socket) {
 
       GameManager.startLol(lobby, io);
       io.to(lobby.code).emit('lobby:updated', { lobby: lobby.toDTO() });
-      io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase });
+      io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase, lolStartedAt: lobby.currentGame?.lolStartedAt ?? null });
     } catch (err) {
       socket.emit('error:general', { message: err.message });
     }
@@ -123,14 +138,14 @@ function registerGameHandlers(io, socket) {
 
       GameManager.endLol(lobby);
       io.to(lobby.code).emit('lobby:updated', { lobby: lobby.toDTO() });
-      io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase });
+      io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase, lolStartedAt: lobby.currentGame?.lolStartedAt ?? null });
     } catch (err) {
       socket.emit('error:general', { message: err.message });
     }
   });
 
   // Host: submit match results
-  socket.on('results:submit', ({ winner, equipe1, equipe2 }) => {
+  socket.on('results:submit', ({ winner, equipe1, equipe2, deaths }) => {
     try {
       const lobby = LobbyManager.getLobbyBySocket(socket.id);
       if (!lobby) return socket.emit('error:general', { message: 'Lobby introuvable.' });
@@ -143,14 +158,14 @@ function registerGameHandlers(io, socket) {
         return socket.emit('error:general', { message: 'Gagnant invalide.' });
       }
 
-      GameManager.submitResults(lobby, { winner, equipe1, equipe2 });
+      GameManager.submitResults(lobby, { winner, equipe1, equipe2 }, deaths || {});
       GameManager.startVotingSelf(lobby);
 
       // Bots vote instantly so they don't block the phase
       BotManager.autoVoteBots(lobby, 'self');
 
       io.to(lobby.code).emit('lobby:updated', { lobby: lobby.toDTO() });
-      io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase });
+      io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase, lolStartedAt: lobby.currentGame?.lolStartedAt ?? null });
 
       // Broadcast initial vote progress (bots already counted)
       const { finalize, _broadcastVoteProgress } = getVotingHelpers();
@@ -177,7 +192,75 @@ function registerGameHandlers(io, socket) {
 
       GameManager.playAgain(lobby, keepTeams);
       io.to(lobby.code).emit('lobby:updated', { lobby: lobby.toDTO() });
-      io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase });
+      io.to(lobby.code).emit('game:phase_changed', { phase: lobby.phase, lolStartedAt: lobby.currentGame?.lolStartedAt ?? null });
+    } catch (err) {
+      socket.emit('error:general', { message: err.message });
+    }
+  });
+
+  // Host (spectating): fetch the Droide/Double-Face players available to target
+  socket.on('game:host_control_targets', () => {
+    try {
+      const lobby = LobbyManager.getLobbyBySocket(socket.id);
+      if (!lobby) return socket.emit('error:general', { message: 'Lobby introuvable.' });
+      if (!_requireSpectatingHost(lobby, socket)) return;
+
+      const droides = lobby.getActivePlayers()
+        .filter((p) => p.secretRole === Roles.DROIDE)
+        .map((p) => ({ id: p.id, username: p.username, team: p.team }));
+
+      const doubleFaces = lobby.getActivePlayers()
+        .filter((p) => p.secretRole === Roles.DOUBLE_FACE)
+        .map((p) => ({
+          id: p.id,
+          username: p.username,
+          team: p.team,
+          currentMode: lobby.currentGame.doubleFaceStates.get(p.id) || null,
+        }));
+
+      socket.emit('game:host_control_targets', { droides, doubleFaces });
+    } catch (err) {
+      socket.emit('error:general', { message: err.message });
+    }
+  });
+
+  // Host (spectating): force a specific Double Face player's mode
+  socket.on('doubleFace:host_set_mode', ({ targetPlayerId, mode }) => {
+    try {
+      const lobby = LobbyManager.getLobbyBySocket(socket.id);
+      if (!lobby) return socket.emit('error:general', { message: 'Lobby introuvable.' });
+      if (!_requireSpectatingHost(lobby, socket)) return;
+
+      if (!['allie', 'imposteur'].includes(mode)) {
+        return socket.emit('error:general', { message: 'Mode invalide.' });
+      }
+      const target = lobby.players.get(targetPlayerId);
+      if (!target || target.secretRole !== Roles.DOUBLE_FACE) {
+        return socket.emit('error:general', { message: 'Cible invalide.' });
+      }
+
+      DoubleFaceManager.hostSetMode(targetPlayerId, mode, lobby, io);
+    } catch (err) {
+      socket.emit('error:general', { message: err.message });
+    }
+  });
+
+  // Host (spectating): overwrite a Droide's current quest with custom text
+  socket.on('game:host_set_droide_quest', ({ targetPlayerId, text }) => {
+    try {
+      const lobby = LobbyManager.getLobbyBySocket(socket.id);
+      if (!lobby) return socket.emit('error:general', { message: 'Lobby introuvable.' });
+      if (!_requireSpectatingHost(lobby, socket)) return;
+
+      if (!text || !text.trim()) {
+        return socket.emit('error:general', { message: 'Quête vide.' });
+      }
+      const target = lobby.players.get(targetPlayerId);
+      if (!target || target.secretRole !== Roles.DROIDE) {
+        return socket.emit('error:general', { message: 'Cible invalide.' });
+      }
+
+      GameManager.hostSetDroideQuest(targetPlayerId, text.trim(), lobby, io);
     } catch (err) {
       socket.emit('error:general', { message: err.message });
     }

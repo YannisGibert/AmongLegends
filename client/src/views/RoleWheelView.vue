@@ -48,7 +48,7 @@ const hasEquipe2 = computed(() => equipe2.value.length > 0)
       </p>
 
       <!-- Wheel animation area -->
-      <div class="wheel-area" @click="!revealed && !spinning && spin()">
+      <div class="wheel-area" @click="isHost && !revealed && !spinning && spin()">
         <div class="wheel-ring" :class="{ spinning }">
           <div
             v-for="(role, key) in LOL_ROLE_INFO"

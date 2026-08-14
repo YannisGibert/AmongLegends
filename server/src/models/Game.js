@@ -21,9 +21,14 @@ class Game {
 
     // Droide commands (per-player, sent privately)
     this.droideCommands = new Map(); // playerId -> current command
-    this.commandDeck = [];           // shuffled deck of commands
     this.commandHistory = [];
     this.droideTimers = new Map();   // playerId -> per-player setTimeout reference
+    this.lolStartedAt = null;                 // timestamp, used for time-gated quests
+    this.droideFirstQuestGiven = new Set();   // playerIds who already received their first quest
+    this.droideRecentQuestIds = new Map();    // playerId -> last quest ids given (avoid immediate repeats)
+
+    // Death count per player submitted by host at game end
+    this.playerDeaths = {}; // { [playerId]: deathCount }
 
     // Final scores for this round
     this.scores = null; // Map<playerId, { round, breakdown }>

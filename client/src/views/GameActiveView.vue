@@ -11,7 +11,7 @@ const lobbyStore = useLobbyStore()
 const playerStore = usePlayerStore()
 const gameStore = useGameStore()
 const { emit: socketEmit } = useSocket()
-const { play, isMuted, toggleMute } = useAudio()
+const { speak, ting, isMuted, toggleMute } = useAudio()
 
 const isHost = computed(() => playerStore.isHost)
 const myRole = computed(() => playerStore.secretRole)
@@ -26,6 +26,25 @@ const myTeamPlayers = computed(() => {
   if (myTeam.value === 'equipe2') return lobbyStore.equipe2Players
   return []
 })
+
+// ─── God-mode panel (host, spectating only) ──────────────────────────────────
+const isSpectatingHost = computed(() => isHost.value && myTeam.value === 'spectateur')
+const selectedDroideId = ref('')
+const customQuestText = ref('')
+
+function teamLabel(team) {
+  return team === 'equipe1' ? 'Éq. 1' : 'Éq. 2'
+}
+
+function hostSetDoubleFaceMode(targetPlayerId, mode) {
+  socketEmit('doubleFace:host_set_mode', { targetPlayerId, mode })
+}
+
+function sendCustomQuest() {
+  if (!selectedDroideId.value || !customQuestText.value.trim()) return
+  socketEmit('game:host_set_droide_quest', { targetPlayerId: selectedDroideId.value, text: customQuestText.value.trim() })
+  customQuestText.value = ''
+}
 
 // ─── Timer countdowns ─────────────────────────────────────────────────────────
 const droideSecondsLeft = ref(null)
@@ -44,6 +63,8 @@ const dfTimerDisplay = computed(() => formatTimer(dfSecondsLeft.value))
 let timerInterval = null
 
 onMounted(() => {
+  if (isSpectatingHost.value) socketEmit('game:host_control_targets', {})
+
   timerInterval = setInterval(() => {
     const now = Date.now()
     if (gameStore.droideTimerEnd) {
@@ -63,10 +84,19 @@ onUnmounted(() => {
   clearInterval(timerInterval)
 })
 
-// Play audio when command changes
+// Read the quest aloud when a new Droide command arrives.
+// immediate:true because the socket event can land before this component
+// mounts (it's set on a global store), so a plain watch would miss the first one.
 watch(() => gameStore.currentCommand, (cmd) => {
-  if (cmd?.audioPath) play(cmd.audioPath)
-})
+  if (!isDroide.value || !cmd) return
+  ting()
+  if (cmd.text) speak(cmd.text)
+}, { immediate: true })
+
+// Notify when the Double Face win objective flips
+watch(() => doubleFaceMode.value, (mode) => {
+  if (isDoubleFace.value && mode) ting()
+}, { immediate: true })
 
 function endLol() {
   socketEmit('game:lol_ended', {})
@@ -169,6 +199,55 @@ function endLol() {
           <button class="btn btn-danger btn-block" @click="endLol">
             🏁 La partie LoL est terminée
           </button>
+        </div>
+
+        <!-- God-mode: spectating host only -->
+        <div v-if="isSpectatingHost" class="host-section god-mode-section">
+          <p class="text-gold text-sm mb-2">🕹 Contrôle en direct</p>
+
+          <p class="text-secondary text-xs mb-2">🎭 Forcer un Double-Face :</p>
+          <div v-if="gameStore.hostControlTargets.doubleFaces.length === 0" class="text-muted text-xs mb-3">
+            Aucun Double-Face dans cette partie.
+          </div>
+          <div
+            v-for="df in gameStore.hostControlTargets.doubleFaces"
+            :key="df.id"
+            class="god-mode-row"
+          >
+            <span class="god-mode-name">{{ df.username }} <span class="text-muted text-xs">({{ teamLabel(df.team) }})</span></span>
+            <div class="god-mode-actions">
+              <button class="btn btn-ghost btn-sm" @click="hostSetDoubleFaceMode(df.id, 'allie')">Allié</button>
+              <button class="btn btn-ghost btn-sm" @click="hostSetDoubleFaceMode(df.id, 'imposteur')">Imposteur</button>
+            </div>
+          </div>
+
+          <p class="text-secondary text-xs mt-3 mb-2">🤖 Donner une quête à un Droide :</p>
+          <div v-if="gameStore.hostControlTargets.droides.length === 0" class="text-muted text-xs">
+            Aucun Droide dans cette partie.
+          </div>
+          <template v-else>
+            <select v-model="selectedDroideId" class="form-select mb-2">
+              <option value="">Choisir un Droide...</option>
+              <option v-for="d in gameStore.hostControlTargets.droides" :key="d.id" :value="d.id">
+                {{ d.username }} ({{ teamLabel(d.team) }})
+              </option>
+            </select>
+            <textarea
+              v-if="selectedDroideId"
+              v-model="customQuestText"
+              class="god-mode-textarea"
+              placeholder="Écris la nouvelle quête..."
+              rows="3"
+            ></textarea>
+            <button
+              v-if="selectedDroideId"
+              class="btn btn-primary btn-sm btn-block mt-2"
+              :disabled="!customQuestText.trim()"
+              @click="sendCustomQuest"
+            >
+              📡 Envoyer la quête
+            </button>
+          </template>
         </div>
       </div>
 
@@ -315,6 +394,49 @@ function endLol() {
 }
 
 .host-section { }
+
+.god-mode-section {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+  margin-top: 0.5rem;
+}
+
+.god-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.god-mode-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.god-mode-actions {
+  display: flex;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+.god-mode-textarea {
+  width: 100%;
+  background: var(--blue-dark);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-family: inherit;
+  padding: 0.5rem;
+  resize: vertical;
+}
+
+.god-mode-textarea:focus {
+  outline: none;
+  border-color: var(--gold);
+}
 
 /* Transitions */
 .state-enter-active, .state-leave-active { transition: all 0.4s ease; }
